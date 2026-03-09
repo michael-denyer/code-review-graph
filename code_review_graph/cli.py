@@ -20,9 +20,7 @@ if sys.version_info < (3, 10):
     print("code-review-graph requires Python 3.10 or higher.")
     print(f"  You are running Python {sys.version}")
     print()
-    print("Options:")
-    print("  1. Install Python 3.10+: https://www.python.org/downloads/")
-    print("  2. Use Docker: docker run -v $(pwd):/repo tirth8205/code-review-graph")
+    print("Install Python 3.10+: https://www.python.org/downloads/")
     sys.exit(1)
 
 import argparse
@@ -114,7 +112,7 @@ def _handle_init(args: argparse.Namespace) -> None:
             existing.setdefault("mcpServers", {}).update(mcp_config["mcpServers"])
             mcp_config = existing
         except (json.JSONDecodeError, KeyError):
-            pass  # Overwrite malformed file
+            print(f"Warning: existing {mcp_path} is malformed, overwriting.")
 
     if dry_run:
         print(f"[dry-run] Would write to {mcp_path}:")

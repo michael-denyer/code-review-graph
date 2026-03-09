@@ -1,6 +1,6 @@
 # Code Review Graph — User Guide
 
-**Version:** v1.7.0 (Mar 9, 2026)
+**Version:** v1.7.2 (Mar 9, 2026)
 
 ## Installation
 
@@ -47,7 +47,7 @@ Interactive D3.js force-directed graph. Starts collapsed (File nodes only) — c
 
 ### 6. Semantic search (optional)
 ```bash
-pip install -e ".[embeddings]"
+pip install "code-review-graph[embeddings]"
 ```
 Then use `embed_graph_tool` to compute vectors. `semantic_search_nodes_tool` automatically uses vector similarity.
 

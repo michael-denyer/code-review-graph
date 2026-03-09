@@ -250,6 +250,12 @@ def full_build(repo_root: Path, store: GraphStore) -> dict:
     parser = CodeParser()
     files = collect_all_files(repo_root)
 
+    # Purge stale data from files no longer on disk
+    existing_files = set(store.get_all_files())
+    current_abs = {str(repo_root / f) for f in files}
+    for stale in existing_files - current_abs:
+        store.remove_file_data(stale)
+
     total_nodes = 0
     total_edges = 0
     errors = []

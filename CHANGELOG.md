@@ -1,16 +1,22 @@
 # Changelog
 
+## [1.7.2] - 2026-03-09
+
+### Fixed
+- **Watch mode thread safety**: SQLite connections now use `check_same_thread=False` for Python 3.10/3.11 compatibility with watchdog's background threads
+- **Full rebuild stale data**: `full_build` now purges nodes/edges from files deleted since last build
+- **Removed unused dependency**: `gitpython` was listed in dependencies but never imported — removed to shrink install footprint
+- **Stale Docker reference**: Removed non-existent Docker image suggestion from Python version check
+
 ## [1.7.0] - 2026-03-09
 
 ### Added
 - **`install` command** — primary entry point for new users (`code-review-graph install`). `init` remains as an alias for backwards compatibility.
 - **`--dry-run` flag** on `install`/`init` — shows what would be written without modifying files
-- **PyPI publish workflow** — GitHub releases now automatically publish to PyPI via trusted publishing
-- **Beginner-proof README** — complete rewrite with real benchmark data:
+- **PyPI publish workflow** — GitHub releases now automatically publish to PyPI via API token
+- **Professional README** — complete rewrite with real benchmark data:
   - Code reviews: 6.8x average token reduction (tested on httpx, FastAPI, Next.js)
   - Live coding tasks: 14.1x average, up to 49.1x on large repos
-  - "How it works for normal people" section for non-technical users
-  - "It just works" section explaining zero-maintenance auto-updates
 
 ### Changed
 - README restructured around the install-and-forget user experience

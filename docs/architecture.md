@@ -109,4 +109,4 @@ BFS from seed nodes (changed files' contents):
 3. Expand up to `max_depth` hops (default: 2)
 4. Collect all reached nodes as "impacted"
 
-This captures both downstream effects (things that call changed code) and upstream context (things that changed code depends on).
+This captures both downstream effects (things that call changed code) and upstream context (things that the changed code depends on).

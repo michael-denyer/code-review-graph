@@ -1,6 +1,6 @@
 """MCP server entry point for Code Review Graph.
 
-Run as: python -m server.main
+Run as: code-review-graph serve
 Communicates via stdio (standard MCP transport).
 """
 

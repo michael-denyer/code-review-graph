@@ -1,6 +1,11 @@
 # Features
 
-## v1.7.0 (Current)
+## v1.7.2 (Current)
+- **Watch mode thread safety**: SQLite connections compatible with Python 3.10/3.11 watchdog threads.
+- **Full rebuild cleanup**: Purges stale data from deleted files during full rebuild.
+- **Dependency trim**: Removed unused `gitpython` dependency.
+
+## v1.7.0
 - **`install` command**: New primary entry point for setup (`code-review-graph install`). `init` remains as an alias.
 - **`--dry-run` flag**: Preview what `install`/`init` would write without modifying files.
 - **PyPI auto-publish**: GitHub releases now automatically publish to PyPI.
