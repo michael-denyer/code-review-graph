@@ -7,6 +7,7 @@ and updates the graph accordingly. Also supports CLI invocation for hooks.
 from __future__ import annotations
 
 import fnmatch
+import hashlib
 import logging
 import subprocess
 import time
@@ -14,7 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 from .graph import GraphStore
-from .parser import CodeParser, file_hash
+from .parser import CodeParser
 
 logger = logging.getLogger(__name__)
 
@@ -268,8 +269,9 @@ def full_build(repo_root: Path, store: GraphStore) -> dict:
     for i, rel_path in enumerate(files, 1):
         full_path = repo_root / rel_path
         try:
-            fhash = file_hash(full_path)
-            nodes, edges = parser.parse_file(full_path)
+            source = full_path.read_bytes()
+            fhash = hashlib.sha256(source).hexdigest()
+            nodes, edges = parser.parse_bytes(full_path, source)
             store.store_file_nodes_edges(str(full_path), nodes, edges, fhash)
             total_nodes += len(nodes)
             total_edges += len(edges)
@@ -347,14 +349,15 @@ def incremental_update(
             continue
 
         try:
-            fhash = file_hash(abs_path)
+            source = abs_path.read_bytes()
+            fhash = hashlib.sha256(source).hexdigest()
             # Check if file actually changed (compare against stored file_hash column)
             existing_nodes = store.get_nodes_by_file(str(abs_path))
             if existing_nodes and existing_nodes[0].file_hash == fhash:
                 # Skip unchanged files (hash match)
                 continue
 
-            nodes, edges = parser.parse_file(abs_path)
+            nodes, edges = parser.parse_bytes(abs_path, source)
             store.store_file_nodes_edges(str(abs_path), nodes, edges, fhash)
             total_nodes += len(nodes)
             total_edges += len(edges)
@@ -470,8 +473,9 @@ def watch(repo_root: Path, store: GraphStore) -> None:
             if _is_binary(path):
                 return
             try:
-                fhash = file_hash(path)
-                nodes, edges = parser.parse_file(path)
+                source = path.read_bytes()
+                fhash = hashlib.sha256(source).hexdigest()
+                nodes, edges = parser.parse_bytes(path, source)
                 store.store_file_nodes_edges(abs_path, nodes, edges, fhash)
                 store.set_metadata(
                     "last_updated", time.strftime("%Y-%m-%dT%H:%M:%S")

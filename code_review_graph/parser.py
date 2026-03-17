@@ -207,17 +207,24 @@ class CodeParser:
 
     def parse_file(self, path: Path) -> tuple[list[NodeInfo], list[EdgeInfo]]:
         """Parse a single file and return extracted nodes and edges."""
+        try:
+            source = path.read_bytes()
+        except (OSError, PermissionError):
+            return [], []
+        return self.parse_bytes(path, source)
+
+    def parse_bytes(self, path: Path, source: bytes) -> tuple[list[NodeInfo], list[EdgeInfo]]:
+        """Parse pre-read bytes and return extracted nodes and edges.
+
+        This avoids re-reading the file from disk, eliminating TOCTOU gaps
+        when the caller has already read the bytes (e.g. for hashing).
+        """
         language = self.detect_language(path)
         if not language:
             return [], []
 
         parser = self._get_parser(language)
         if not parser:
-            return [], []
-
-        try:
-            source = path.read_bytes()
-        except (OSError, PermissionError):
             return [], []
 
         tree = parser.parse(source)
