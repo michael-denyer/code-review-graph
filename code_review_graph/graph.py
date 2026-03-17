@@ -324,6 +324,9 @@ class GraphStore:
                         if pred not in visited:
                             next_frontier.add(pred)
                             impacted.add(pred)
+            # Cap total nodes to prevent resource exhaustion on dense graphs
+            if len(visited) + len(next_frontier) > max_nodes:
+                break
             frontier = next_frontier
             depth += 1
 
@@ -417,19 +420,26 @@ class GraphStore:
     def get_edges_among(self, qualified_names: set[str]) -> list[GraphEdge]:
         """Return edges where both source and target are in the given set.
 
-        Uses a single SQL query instead of per-node lookups.
+        Batches the source-side IN clause to stay under SQLite's default
+        SQLITE_MAX_VARIABLE_NUMBER limit, then filters targets in Python.
         """
         if not qualified_names:
             return []
-        # Parameterized IN clause — placeholders are "?" markers, not user data
         qns = list(qualified_names)
-        placeholders = ",".join("?" for _ in qns)
-        rows = self._conn.execute(  # nosec B608
-            f"SELECT * FROM edges WHERE source_qualified IN ({placeholders})"
-            f" AND target_qualified IN ({placeholders})",
-            qns + qns,
-        ).fetchall()
-        return [self._row_to_edge(r) for r in rows]
+        results: list[GraphEdge] = []
+        batch_size = 450  # Stay well under SQLite's default 999 limit
+        for i in range(0, len(qns), batch_size):
+            batch = qns[i:i + batch_size]
+            placeholders = ",".join("?" for _ in batch)
+            rows = self._conn.execute(  # nosec B608
+                f"SELECT * FROM edges WHERE source_qualified IN ({placeholders})",
+                batch,
+            ).fetchall()
+            for r in rows:
+                edge = self._row_to_edge(r)
+                if edge.target_qualified in qualified_names:
+                    results.append(edge)
+        return results
 
     # --- Internal helpers ---
 
