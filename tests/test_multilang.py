@@ -463,3 +463,58 @@ class TestSolidityParsing:
             if n.kind == "Function" and n.parent_name == "RewardMath"
         }
         assert "uint256" in funcs["mulPrecise"].return_type
+
+
+class TestRParsing:
+    def setup_method(self):
+        self.parser = CodeParser()
+        self.nodes, self.edges = self.parser.parse_file(FIXTURES / "sample.R")
+
+    def test_detects_language(self):
+        assert self.parser.detect_language(Path("script.r")) == "r"
+        assert self.parser.detect_language(Path("script.R")) == "r"
+
+    def test_finds_functions(self):
+        funcs = [n for n in self.nodes if n.kind == "Function" and n.parent_name is None]
+        names = {f.name for f in funcs}
+        assert "add" in names
+        assert "multiply" in names
+        assert "process_data" in names
+
+    def test_finds_s4_classes(self):
+        classes = [n for n in self.nodes if n.kind == "Class"]
+        names = {c.name for c in classes}
+        assert "MyClass" in names
+
+    def test_finds_class_methods(self):
+        methods = [n for n in self.nodes if n.kind == "Function" and n.parent_name == "MyClass"]
+        names = {m.name for m in methods}
+        assert "greet" in names
+        assert "get_age" in names
+
+    def test_finds_imports(self):
+        imports = [e for e in self.edges if e.kind == "IMPORTS_FROM"]
+        targets = {e.target for e in imports}
+        assert "dplyr" in targets
+        assert "ggplot2" in targets
+        assert "utils.R" in targets
+
+    def test_finds_calls(self):
+        calls = [e for e in self.edges if e.kind == "CALLS"]
+        targets = {e.target for e in calls}
+        assert "dplyr::filter" in targets
+        assert "dplyr::summarize" in targets
+
+    def test_finds_params(self):
+        funcs = {n.name: n for n in self.nodes if n.kind == "Function"}
+        assert funcs["add"].params is not None
+        assert "x" in funcs["add"].params
+        assert "y" in funcs["add"].params
+
+    def test_finds_contains(self):
+        contains = [e for e in self.edges if e.kind == "CONTAINS"]
+        targets = {e.target.split("::")[-1] for e in contains}
+        assert "add" in targets
+        assert "multiply" in targets
+        assert "MyClass" in targets
+        assert "MyClass.greet" in targets

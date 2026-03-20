@@ -73,6 +73,8 @@ EXTENSION_TO_LANGUAGE: dict[str, str] = {
     ".swift": "swift",
     ".php": "php",
     ".sol": "solidity",
+    ".r": "r",
+    ".R": "r",
 }
 
 # Tree-sitter node type mappings per language
@@ -92,6 +94,7 @@ _CLASS_TYPES: dict[str, list[str]] = {
         "enum_declaration", "struct_declaration",
     ],
     "ruby": ["class", "module"],
+    "r": [],  # Classes detected via call pattern-matching (setClass/setRefClass)
     "kotlin": ["class_declaration", "object_declaration"],
     "swift": ["class_declaration", "struct_declaration", "protocol_declaration"],
     "php": ["class_declaration", "interface_declaration"],
@@ -114,6 +117,7 @@ _FUNCTION_TYPES: dict[str, list[str]] = {
     "cpp": ["function_definition"],
     "csharp": ["method_declaration", "constructor_declaration"],
     "ruby": ["method", "singleton_method"],
+    "r": ["function_definition"],
     "kotlin": ["function_declaration"],
     "swift": ["function_declaration"],
     "php": ["function_definition", "method_declaration"],
@@ -139,6 +143,7 @@ _IMPORT_TYPES: dict[str, list[str]] = {
     "cpp": ["preproc_include"],
     "csharp": ["using_directive"],
     "ruby": ["call"],  # require/require_relative
+    "r": ["call"],  # library(), require(), source() — filtered downstream
     "kotlin": ["import_header"],
     "swift": ["import_declaration"],
     "php": ["namespace_use_declaration"],
@@ -157,6 +162,7 @@ _CALL_TYPES: dict[str, list[str]] = {
     "cpp": ["call_expression"],
     "csharp": ["invocation_expression", "object_creation_expression"],
     "ruby": ["call", "method_call"],
+    "r": ["call"],
     "kotlin": ["call_expression"],
     "swift": ["call_expression"],
     "php": ["function_call_expression", "member_call_expression"],
@@ -180,6 +186,8 @@ _TEST_FILE_PATTERNS = [
     re.compile(r".*\.spec\.[jt]sx?$"),
     re.compile(r".*_test\.go$"),
     re.compile(r"tests?/"),
+    re.compile(r"test[_-].*\.[rR]$"),
+    re.compile(r"tests/testthat/"),
 ]
 
 
@@ -321,6 +329,26 @@ class CodeParser:
 
         for child in root.children:
             node_type = child.type
+
+            # --- R: function definitions via assignment ---
+            if language == "r" and node_type == "binary_operator":
+                handled = self._handle_r_binary_operator(
+                    child, source, language, file_path, nodes, edges,
+                    enclosing_class, enclosing_func,
+                    import_map, defined_names,
+                )
+                if handled:
+                    continue
+
+            # --- R: setClass/setRefClass/setGeneric calls → Class nodes ---
+            if language == "r" and node_type == "call":
+                handled = self._handle_r_call(
+                    child, source, language, file_path, nodes, edges,
+                    enclosing_class, enclosing_func,
+                    import_map, defined_names,
+                )
+                if handled:
+                    continue
 
             # --- Classes ---
             if node_type in class_types:
@@ -623,6 +651,18 @@ class CodeParser:
                         break
 
             target_type = target.type
+
+            # R: function names live on the left side of binary_operator
+            if language == "r" and target_type == "binary_operator":
+                r_children = target.children
+                if (
+                    len(r_children) >= 3
+                    and r_children[0].type == "identifier"
+                    and r_children[2].type == "function_definition"
+                ):
+                    name = r_children[0].text.decode("utf-8", errors="replace")
+                    defined_names.add(name)
+                continue
 
             # Collect defined function/class names
             if target_type in func_types or target_type in class_types:
@@ -953,6 +993,26 @@ class CodeParser:
                     val = child.text.decode("utf-8", errors="replace").strip('"')
                     if val:
                         imports.append(val)
+        elif language == "r":
+            # library(pkg), require(pkg), source("file.R")
+            func_name = None
+            for child in node.children:
+                if child.type == "identifier":
+                    func_name = child.text.decode("utf-8", errors="replace")
+                    break
+            if func_name in ("library", "require", "source"):
+                for child in node.children:
+                    if child.type == "arguments":
+                        for arg in child.children:
+                            if arg.type == "argument":
+                                for sub in arg.children:
+                                    if sub.type == "identifier":
+                                        imports.append(sub.text.decode("utf-8", errors="replace"))
+                                    elif sub.type == "string":
+                                        for sc in sub.children:
+                                            if sc.type == "string_content":
+                                                val = sc.text.decode("utf-8", errors="replace")
+                                                imports.append(val)
         elif language == "ruby":
             # require 'module' or require_relative 'path'
             if "require" in text:
@@ -999,4 +1059,278 @@ class CodeParser:
         if first.type in ("scoped_identifier", "qualified_name"):
             return first.text.decode("utf-8", errors="replace")
 
+        # R namespace-qualified call: dplyr::filter()
+        if first.type == "namespace_operator":
+            return first.text.decode("utf-8", errors="replace")
+
         return None
+
+    # ------------------------------------------------------------------
+    # R-specific handlers
+    # ------------------------------------------------------------------
+
+    def _handle_r_binary_operator(
+        self, node, source: bytes, language: str, file_path: str,
+        nodes: list[NodeInfo], edges: list[EdgeInfo],
+        enclosing_class: Optional[str], enclosing_func: Optional[str],
+        import_map: Optional[dict[str, str]],
+        defined_names: Optional[set[str]],
+    ) -> bool:
+        """Handle R binary_operator nodes: name <- function(...) { ... }.
+
+        Returns True if the node was handled (a function definition), False otherwise.
+        """
+        children = node.children
+        if len(children) < 3:
+            return False
+
+        left, op, right = children[0], children[1], children[2]
+        if op.type not in ("<-", "="):
+            return False
+
+        # name <- function(...) { ... }
+        if right.type == "function_definition" and left.type == "identifier":
+            name = left.text.decode("utf-8", errors="replace")
+            is_test = _is_test_function(name, file_path)
+            kind = "Test" if is_test else "Function"
+            qualified = self._qualify(name, file_path, enclosing_class)
+            params = self._get_params(right, language, source)
+
+            nodes.append(NodeInfo(
+                kind=kind,
+                name=name,
+                file_path=file_path,
+                line_start=right.start_point[0] + 1,
+                line_end=right.end_point[0] + 1,
+                language=language,
+                parent_name=enclosing_class,
+                params=params,
+                is_test=is_test,
+            ))
+
+            container = (
+                self._qualify(enclosing_class, file_path, None)
+                if enclosing_class else file_path
+            )
+            edges.append(EdgeInfo(
+                kind="CONTAINS",
+                source=container,
+                target=qualified,
+                file_path=file_path,
+                line=right.start_point[0] + 1,
+            ))
+
+            # Recurse into function body for calls
+            self._extract_from_tree(
+                right, source, language, file_path, nodes, edges,
+                enclosing_class=enclosing_class, enclosing_func=name,
+                import_map=import_map, defined_names=defined_names,
+            )
+            return True
+
+        # name <- setRefClass(...) / setClass(...) — handled by _handle_r_call
+        # but the call is wrapped in a binary_operator, so delegate
+        if right.type == "call" and left.type == "identifier":
+            call_func = None
+            for child in right.children:
+                if child.type == "identifier":
+                    call_func = child.text.decode("utf-8", errors="replace")
+                    break
+            if call_func in ("setRefClass", "setClass", "setGeneric"):
+                assign_name = left.text.decode("utf-8", errors="replace")
+                return self._handle_r_class_call(
+                    right, source, language, file_path, nodes, edges,
+                    enclosing_class, enclosing_func,
+                    import_map, defined_names,
+                    assign_name=assign_name,
+                )
+
+        return False
+
+    def _handle_r_call(
+        self, node, source: bytes, language: str, file_path: str,
+        nodes: list[NodeInfo], edges: list[EdgeInfo],
+        enclosing_class: Optional[str], enclosing_func: Optional[str],
+        import_map: Optional[dict[str, str]],
+        defined_names: Optional[set[str]],
+    ) -> bool:
+        """Handle R call nodes for imports and class definitions.
+
+        Returns True if the node was fully handled, False to let generic logic proceed.
+        """
+        func_name = None
+        for child in node.children:
+            if child.type == "identifier":
+                func_name = child.text.decode("utf-8", errors="replace")
+                break
+            if child.type == "namespace_operator":
+                # dplyr::filter() — not an import, treat as a regular call
+                func_name = child.text.decode("utf-8", errors="replace")
+                break
+
+        if not func_name:
+            return False
+
+        # Import calls: library(), require(), source()
+        if func_name in ("library", "require", "source"):
+            imports = self._extract_import(node, language, source)
+            for imp_target in imports:
+                edges.append(EdgeInfo(
+                    kind="IMPORTS_FROM",
+                    source=file_path,
+                    target=imp_target,
+                    file_path=file_path,
+                    line=node.start_point[0] + 1,
+                ))
+            return True
+
+        # Bare setRefClass/setClass/setGeneric (without assignment)
+        if func_name in ("setRefClass", "setClass", "setGeneric"):
+            return self._handle_r_class_call(
+                node, source, language, file_path, nodes, edges,
+                enclosing_class, enclosing_func,
+                import_map, defined_names,
+            )
+
+        # Regular call inside a function body → CALLS edge
+        if enclosing_func:
+            call_name = self._get_call_name(node, language, source)
+            if call_name:
+                caller = self._qualify(enclosing_func, file_path, enclosing_class)
+                target = self._resolve_call_target(
+                    call_name, file_path, language,
+                    import_map or {}, defined_names or set(),
+                )
+                edges.append(EdgeInfo(
+                    kind="CALLS",
+                    source=caller,
+                    target=target,
+                    file_path=file_path,
+                    line=node.start_point[0] + 1,
+                ))
+
+        # Recurse into call arguments for nested calls
+        self._extract_from_tree(
+            node, source, language, file_path, nodes, edges,
+            enclosing_class=enclosing_class, enclosing_func=enclosing_func,
+            import_map=import_map, defined_names=defined_names,
+        )
+        return True
+
+    def _handle_r_class_call(
+        self, node, source: bytes, language: str, file_path: str,
+        nodes: list[NodeInfo], edges: list[EdgeInfo],
+        enclosing_class: Optional[str], enclosing_func: Optional[str],
+        import_map: Optional[dict[str, str]],
+        defined_names: Optional[set[str]],
+        assign_name: Optional[str] = None,
+    ) -> bool:
+        """Handle setClass/setRefClass/setGeneric calls → Class nodes."""
+        # Extract class name from first string argument
+        class_name = None
+        for child in node.children:
+            if child.type == "arguments":
+                for arg in child.children:
+                    if arg.type == "argument":
+                        for sub in arg.children:
+                            if sub.type == "string":
+                                for sc in sub.children:
+                                    if sc.type == "string_content":
+                                        class_name = sc.text.decode("utf-8", errors="replace")
+                                        break
+                        if class_name:
+                            break
+                break
+
+        if not class_name:
+            class_name = assign_name
+        if not class_name:
+            return False
+
+        qualified = self._qualify(class_name, file_path, enclosing_class)
+        nodes.append(NodeInfo(
+            kind="Class",
+            name=class_name,
+            file_path=file_path,
+            line_start=node.start_point[0] + 1,
+            line_end=node.end_point[0] + 1,
+            language=language,
+            parent_name=enclosing_class,
+        ))
+        edges.append(EdgeInfo(
+            kind="CONTAINS",
+            source=file_path,
+            target=qualified,
+            file_path=file_path,
+            line=node.start_point[0] + 1,
+        ))
+
+        # For setRefClass, extract methods
+        for child in node.children:
+            if child.type == "arguments":
+                for arg in child.children:
+                    if arg.type == "argument":
+                        # Look for methods = list(...)
+                        arg_name = None
+                        arg_value = None
+                        for sub in arg.children:
+                            if sub.type == "identifier":
+                                arg_name = sub.text.decode("utf-8", errors="replace")
+                            elif sub.type == "call":
+                                arg_value = sub
+                        if arg_name == "methods" and arg_value is not None:
+                            self._extract_r_methods(
+                                arg_value, source, language, file_path,
+                                nodes, edges, class_name,
+                                import_map, defined_names,
+                            )
+
+        return True
+
+    def _extract_r_methods(
+        self, list_call, source: bytes, language: str, file_path: str,
+        nodes: list[NodeInfo], edges: list[EdgeInfo],
+        class_name: str,
+        import_map: Optional[dict[str, str]],
+        defined_names: Optional[set[str]],
+    ) -> None:
+        """Extract methods from a setRefClass methods = list(...) call."""
+        for child in list_call.children:
+            if child.type == "arguments":
+                for arg in child.children:
+                    if arg.type == "argument":
+                        method_name = None
+                        func_def = None
+                        for sub in arg.children:
+                            if sub.type == "identifier":
+                                method_name = sub.text.decode("utf-8", errors="replace")
+                            elif sub.type == "function_definition":
+                                func_def = sub
+                        if method_name and func_def:
+                            qualified = self._qualify(method_name, file_path, class_name)
+                            params = self._get_params(func_def, language, source)
+                            nodes.append(NodeInfo(
+                                kind="Function",
+                                name=method_name,
+                                file_path=file_path,
+                                line_start=func_def.start_point[0] + 1,
+                                line_end=func_def.end_point[0] + 1,
+                                language=language,
+                                parent_name=class_name,
+                                params=params,
+                            ))
+                            edges.append(EdgeInfo(
+                                kind="CONTAINS",
+                                source=self._qualify(class_name, file_path, None),
+                                target=qualified,
+                                file_path=file_path,
+                                line=func_def.start_point[0] + 1,
+                            ))
+                            # Recurse into method body for calls
+                            self._extract_from_tree(
+                                func_def, source, language, file_path, nodes, edges,
+                                enclosing_class=class_name,
+                                enclosing_func=method_name,
+                                import_map=import_map,
+                                defined_names=defined_names,
+                            )
