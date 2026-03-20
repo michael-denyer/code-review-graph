@@ -518,3 +518,14 @@ class TestRParsing:
         assert "multiply" in targets
         assert "MyClass" in targets
         assert "MyClass.greet" in targets
+
+    def test_detects_test_functions(self):
+        parser = CodeParser()
+        nodes, _edges = parser.parse_file(FIXTURES / "test_sample.R")
+        # File should be detected as a test file
+        file_node = [n for n in nodes if n.kind == "File"][0]
+        assert file_node.is_test is True
+        # test_add should be detected as a test function
+        test_funcs = [n for n in nodes if n.is_test and n.kind == "Test"]
+        names = {f.name for f in test_funcs}
+        assert "test_add" in names

@@ -73,8 +73,7 @@ EXTENSION_TO_LANGUAGE: dict[str, str] = {
     ".swift": "swift",
     ".php": "php",
     ".sol": "solidity",
-    ".r": "r",
-    ".R": "r",
+    ".r": "r",  # .lower() in detect_language handles .R → .r
 }
 
 # Tree-sitter node type mappings per language
@@ -662,7 +661,7 @@ class CodeParser:
                 ):
                     name = r_children[0].text.decode("utf-8", errors="replace")
                     defined_names.add(name)
-                continue
+                    continue
 
             # Collect defined function/class names
             if target_type in func_types or target_type in class_types:
