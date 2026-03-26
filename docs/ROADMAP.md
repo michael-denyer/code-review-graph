@@ -2,64 +2,66 @@
 
 ## Shipped
 
+### v2.0.0
+- 22 MCP tools (up from 9) and 5 MCP prompts
+- 18 languages (added Dart, R, Perl)
+- Execution flow detection with criticality scoring
+- Community detection (Leiden algorithm via igraph, file-based fallback)
+- Architecture overview with coupling warnings
+- Risk-scored change detection (`detect_changes`)
+- Refactoring tools (rename preview, dead code, suggestions)
+- Wiki generation from community structure
+- Multi-repo registry with cross-repo search
+- FTS5 full-text search with porter stemming
+- Database migrations (v1-v5)
+- Evaluation framework with matplotlib visualization
+- TypeScript tsconfig path alias resolution
+- MiniMax embedding provider (embo-01)
+- Optional dependency groups: `[embeddings]`, `[google-embeddings]`, `[communities]`, `[eval]`, `[wiki]`, `[all]`
+- 486 tests across 22 test files
+
+### v1.8.4
+- Multi-word AND search, call target resolution, impact radius pagination
+- `find_large_functions_tool`, Vue SFC and Solidity support
+- Documentation overhaul
+
 ### v1.7.0
 - `install` command as primary entry point (`init` kept as alias)
 - `--dry-run` flag for previewing install/init changes
 - Automatic PyPI publishing via GitHub Actions on release
 - README rewrite with real benchmark data from httpx, FastAPI, and Next.js
 
-### v1.6.4
-- Portable `uvx`-based MCP config — no absolute paths, works on any machine with `uv`
-- Removed `_safe_path` symlink workaround (superseded by `uvx`)
+### v1.6.x
+- Portable `uvx`-based MCP config
+- SessionStart hook for automatic graph tool preference
+- 24 audit fixes: C/C++ support, performance, CI hardening
 
-### v1.6.3
-- SessionStart hook: Claude Code prefers graph tools over full codebase scans automatically
-- plugin.json corrected for official marketplace submission
-- README cleanup
-
-### v1.6.2
-- 24 audit fixes: critical bugs, performance, parser, tests, CI, docs, accessibility
-- C/C++ parser support with full node extraction
-- Name extraction fixes for Kotlin, Swift, Ruby
-- NetworkX caching, batch queries, subprocess timeouts, chunked search
-- CI: coverage enforcement, bandit, mypy
-- 40+ new tests, 7 language fixtures
-
-### v1.5.3
-- `init` auto-handles spaces in paths (macOS iCloud, OneDrive, etc.)
-- Works without git — `build`, `status`, `visualize`, `watch` fall back to cwd
-- Skills registered in plugin.json for Claude Code plugin discovery
-
-### v1.5.0
-- Generated files organized into `.code-review-graph/` directory (auto-gitignored, legacy migration)
-- Visualization density: collapsed start, search, edge toggles, scale-aware layout
-- Project cleanup: removed redundant files and directories
+### v1.5.x
+- Generated files in `.code-review-graph/` directory
+- Visualization density: collapsed start, search, edge toggles
+- Works without git
 
 ### v1.4.0
-- `init` command for automatic `.mcp.json` setup
-- Interactive D3.js graph visualization (`visualize` command)
-- `serve` command to start MCP server directly
-- Comprehensive documentation overhaul
+- `init` command, interactive D3.js visualization, `serve` command
 
 ### v1.3.0
-- Python version check with Docker fallback
-- Universal install via `pip install code-review-graph`
-- CLI entry point (`code-review-graph` command)
+- Universal pip install, CLI entry point, Python version check
 
-### v1.2.0
-- Logging improvements and watch debounce
-- tools.py fixes and CI coverage via GitHub Actions
+### v1.1.0-v1.2.0
+- Watch mode, vector embeddings, logging, CI coverage
 
-### v1.1.0
-- Watch mode, vector embeddings, 12+ languages verified
+### v1.0.0 (Foundation)
+- Persistent SQLite knowledge graph, Tree-sitter parsing, incremental updates
+- Impact radius analysis, 6 MCP tools, 3 skills
 
-## v2.0 (Planned)
-- Surgical edit suggestions (auto-fix common patterns)
+## Planned
+
 - GitHub PR bot integration
 - Team sync (shared graph via git-tracked DB)
-- Memgraph/Cypher support for large-scale graphs
+- SSE/HTTP MCP transport for multi-client access
+- Performance optimization for monorepos (>50k files)
 
 ## Ongoing
+
 - Additional language grammars as requested
-- Performance optimization for monorepos (>50k files)
 - Integration with more Claude Code features as the platform evolves

@@ -19,15 +19,15 @@
 │  ┌────────────────────────────────────────────┐              │
 │  │            MCP Server (stdio)              │              │
 │  │                                            │              │
-│  │  Tools:                                    │              │
-│  │  ├── build_or_update_graph_tool            │              │
-│  │  ├── get_impact_radius_tool                │              │
-│  │  ├── query_graph_tool                      │              │
-│  │  ├── get_review_context_tool               │              │
-│  │  ├── semantic_search_nodes_tool            │              │
-│  │  ├── embed_graph_tool                      │              │
-│  │  ├── list_graph_stats_tool                 │              │
-│  │  └── get_docs_section_tool                 │              │
+│  │  22 MCP Tools + 5 MCP Prompts              │              │
+│  │  ├── Core: build, impact, query, review,   │              │
+│  │  │   search, embed, stats, docs, large_fn  │              │
+│  │  ├── Flows: list, get, affected            │              │
+│  │  ├── Communities: list, get, architecture   │              │
+│  │  ├── Analysis: detect_changes, refactor,   │              │
+│  │  │   apply_refactor                        │              │
+│  │  ├── Wiki: generate, get_page              │              │
+│  │  └── Multi-repo: list_repos, cross_search  │              │
 │  └────────────────┬───────────────────────────┘              │
 └───────────────────┼──────────────────────────────────────────┘
                     │
@@ -70,11 +70,16 @@
 ## Storage
 
 ### SQLite Schema
-- **nodes** table: id, kind, name, qualified_name, file_path, line_start/end, language, etc.
+- **nodes** table: id, kind, name, qualified_name, file_path, line_start/end, language, community_id, etc.
 - **edges** table: id, kind, source_qualified, target_qualified, file_path, line
-- **metadata** table: key-value pairs (last_updated, build_type)
+- **metadata** table: key-value pairs (last_updated, build_type, schema_version)
+- **flows** table: id, name, entry_point_id, depth, node_count, file_count, criticality, path_json
+- **flow_memberships** table: flow_id, node_id, position
+- **communities** table: id, name, level, parent_id, cohesion, size, dominant_language, description
+- **nodes_fts** (FTS5 virtual table): full-text search on name, qualified_name, file_path, signature
+- **embeddings** table (separate DB): node_id, model, vector, hash
 
-Indexes on qualified_name, file_path, and edge source/target for fast lookups.
+Indexes on qualified_name, file_path, edge source/target, criticality, community_id, and cohesion for fast lookups.
 
 WAL mode enabled for concurrent read access during updates.
 

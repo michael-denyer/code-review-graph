@@ -2,19 +2,31 @@
 
 ## Project Overview
 
-**code-review-graph** is a persistent, incrementally-updated knowledge graph for token-efficient code reviews with Claude Code. It parses codebases using Tree-sitter, builds a structural graph in SQLite, and exposes it via MCP tools.
+**code-review-graph** is a persistent, incrementally-updated knowledge graph for token-efficient code reviews with Claude Code. It parses codebases using Tree-sitter, builds a structural graph in SQLite, and exposes it via MCP tools and prompts.
 
 ## Architecture
 
 - **Core Package**: `code_review_graph/` (Python 3.10+)
-  - `parser.py` — Tree-sitter multi-language AST parser (15 languages including Vue SFC and Solidity)
+  - `parser.py` — Tree-sitter multi-language AST parser (18 languages including Vue SFC, Solidity, Dart, R, Perl)
   - `graph.py` — SQLite-backed graph store (nodes, edges, BFS impact analysis)
-  - `tools.py` — 9 MCP tool implementations
+  - `tools.py` — 22 MCP tool implementations
+  - `main.py` — FastMCP server entry point (stdio transport), registers 22 tools + 5 prompts
   - `incremental.py` — Git-based change detection, file watching
-  - `embeddings.py` — Optional vector embeddings (local or Google Gemini)
+  - `embeddings.py` — Optional vector embeddings (Local sentence-transformers, Google Gemini, MiniMax)
   - `visualization.py` — D3.js interactive HTML graph generator
-  - `cli.py` — CLI entry point (`code-review-graph build/update/watch/serve/...`)
-  - `main.py` — FastMCP server entry point (stdio transport)
+  - `cli.py` — CLI entry point (install, build, update, watch, status, visualize, serve, wiki, detect-changes, register, unregister, repos, eval)
+  - `flows.py` — Execution flow detection and criticality scoring
+  - `communities.py` — Community detection (Leiden algorithm or file-based grouping) and architecture overview
+  - `search.py` — FTS5 hybrid search (keyword + vector)
+  - `changes.py` — Risk-scored change impact analysis (detect-changes)
+  - `refactor.py` — Rename preview, dead code detection, refactoring suggestions
+  - `hints.py` — Review hint generation
+  - `prompts.py` — 5 MCP prompt templates (review_changes, architecture_map, debug_issue, onboard_developer, pre_merge_check)
+  - `wiki.py` — Markdown wiki generation from community structure
+  - `skills.py` — Skill definitions for Claude Code plugin
+  - `registry.py` — Multi-repo registry with connection pool
+  - `migrations.py` — Database schema migrations (v1-v5)
+  - `tsconfig_resolver.py` — TypeScript path alias resolution
 
 - **VS Code Extension**: `code-review-graph-vscode/` (TypeScript)
   - Separate subproject with its own `package.json`, `tsconfig.json`
@@ -26,7 +38,7 @@
 
 ```bash
 # Development
-uv run pytest tests/ --tb=short -q          # Run tests (182 tests)
+uv run pytest tests/ --tb=short -q          # Run tests (486 tests)
 uv run ruff check code_review_graph/        # Lint
 uv run mypy code_review_graph/ --ignore-missing-imports --no-strict-optional
 
@@ -35,6 +47,11 @@ uv run code-review-graph build              # Full graph build
 uv run code-review-graph update             # Incremental update
 uv run code-review-graph status             # Show stats
 uv run code-review-graph serve              # Start MCP server
+uv run code-review-graph wiki               # Generate markdown wiki
+uv run code-review-graph detect-changes     # Risk-scored change analysis
+uv run code-review-graph register <path>    # Register repo in multi-repo registry
+uv run code-review-graph repos              # List registered repos
+uv run code-review-graph eval               # Run evaluation benchmarks
 ```
 
 ## Code Conventions
@@ -64,8 +81,22 @@ uv run code-review-graph serve              # Start MCP server
 - `tests/test_tools.py` — MCP tool integration tests
 - `tests/test_visualization.py` — Export, HTML generation, C++ resolution
 - `tests/test_incremental.py` — Build, update, migration, git ops
-- `tests/test_multilang.py` — 15 language parsing tests (including Vue and Solidity)
+- `tests/test_multilang.py` — 18 language parsing tests (including Vue, Solidity, Dart, R, Perl)
 - `tests/test_embeddings.py` — Vector encode/decode, similarity, store
+- `tests/test_flows.py` — Execution flow detection and criticality
+- `tests/test_communities.py` — Community detection, architecture overview
+- `tests/test_changes.py` — Risk-scored change analysis
+- `tests/test_refactor.py` — Rename preview, dead code, suggestions
+- `tests/test_search.py` — FTS5 hybrid search
+- `tests/test_hints.py` — Review hint generation
+- `tests/test_prompts.py` — MCP prompt template tests
+- `tests/test_wiki.py` — Wiki generation
+- `tests/test_skills.py` — Skill definitions
+- `tests/test_registry.py` — Multi-repo registry
+- `tests/test_migrations.py` — Database migrations
+- `tests/test_eval.py` — Evaluation framework
+- `tests/test_tsconfig_resolver.py` — TypeScript path resolution
+- `tests/test_integration_v2.py` — v2 pipeline integration test
 - `tests/fixtures/` — Sample files for each supported language
 
 ## CI Pipeline

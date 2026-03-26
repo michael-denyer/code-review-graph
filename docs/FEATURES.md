@@ -1,6 +1,24 @@
 # Features
 
-## v1.8.4 (Current)
+## v2.0.0 (Current)
+- **22 MCP tools** (up from 9): 13 new tools for flows, communities, architecture, refactoring, wiki, multi-repo, and risk-scored change detection.
+- **5 MCP prompts**: `review_changes`, `architecture_map`, `debug_issue`, `onboard_developer`, `pre_merge_check` workflow templates.
+- **18 languages** (up from 15): Added Dart, R, Perl support.
+- **Execution flows**: Trace call chains from entry points (HTTP handlers, CLI commands, tests), sorted by criticality score.
+- **Community detection**: Cluster related code entities via Leiden algorithm (igraph) or file-based grouping.
+- **Architecture overview**: Auto-generated architecture map with module summaries and cross-community coupling warnings.
+- **Risk-scored change detection**: `detect_changes` maps git diffs to affected functions, flows, communities, and test coverage gaps with priority ordering.
+- **Refactoring tools**: Rename preview with edit list, dead code detection, community-driven refactoring suggestions.
+- **Wiki generation**: Auto-generate markdown wiki pages for each community with optional LLM summaries (ollama).
+- **Multi-repo registry**: Register multiple repositories, search across all of them with `cross_repo_search`.
+- **Full-text search**: FTS5 virtual table with porter stemming for hybrid keyword + vector search.
+- **Database migrations**: Versioned schema migrations (v1-v5) with automatic upgrade on startup.
+- **Optional dependency groups**: `[embeddings]`, `[google-embeddings]`, `[communities]`, `[eval]`, `[wiki]`, `[all]`.
+- **Evaluation framework**: Benchmark suite with matplotlib visualization.
+- **TypeScript path resolution**: tsconfig.json paths/baseUrl alias resolution for imports.
+- **486 tests** across 22 test files.
+
+## v1.8.4
 - **Multi-word AND search**: `search_nodes` now requires all words to match (case-insensitive), producing more precise results.
 - **Call target resolution**: Bare call targets are resolved to qualified names using same-file definitions, improving `callers_of`/`callees_of` accuracy.
 - **Impact radius pagination**: `get_impact_radius` returns `truncated` flag and `total_impacted` count; `max_results` parameter controls output size.

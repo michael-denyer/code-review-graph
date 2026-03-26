@@ -10,7 +10,7 @@
   <a href="https://github.com/tirth8205/code-review-graph/actions/workflows/ci.yml"><img src="https://github.com/tirth8205/code-review-graph/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg?style=flat-square" alt="Python 3.10+"></a>
   <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-compatible-green.svg?style=flat-square" alt="MCP"></a>
-  <a href="#"><img src="https://img.shields.io/badge/version-1.8.4-purple.svg?style=flat-square" alt="v1.8.4"></a>
+  <a href="#"><img src="https://img.shields.io/badge/version-2.0.0-purple.svg?style=flat-square" alt="v2.0.0"></a>
 </p>
 
 <br>
@@ -84,10 +84,10 @@ On every git commit or file save, a hook fires. The graph diffs changed files, f
 </details>
 
 <details>
-<summary><strong>15 supported languages</strong></summary>
+<summary><strong>18 supported languages</strong></summary>
 <br>
 
-Python, TypeScript, JavaScript, Vue, Go, Rust, Java, Scala, C#, Ruby, Kotlin, Swift, PHP, Solidity, C/C++
+Python, TypeScript/TSX, JavaScript, Vue, Go, Rust, Java, Scala, C#, Ruby, Kotlin, Swift, PHP, Solidity, C/C++, Dart, R, Perl
 
 Each language has full Tree-sitter grammar support for functions, classes, imports, call sites, inheritance, and test detection.
 
@@ -172,13 +172,19 @@ Large repositories benefit most. In the Next.js monorepo (27,732 files, 739K tok
 <br>
 
 ```bash
-code-review-graph install     # Register MCP server with Claude Code
-code-review-graph build       # Parse entire codebase
-code-review-graph update      # Incremental update (changed files only)
-code-review-graph status      # Graph statistics
-code-review-graph watch       # Auto-update on file changes
-code-review-graph visualize   # Generate interactive HTML graph
-code-review-graph serve       # Start MCP server
+code-review-graph install          # Register MCP server with Claude Code
+code-review-graph build            # Parse entire codebase
+code-review-graph update           # Incremental update (changed files only)
+code-review-graph status           # Graph statistics
+code-review-graph watch            # Auto-update on file changes
+code-review-graph visualize        # Generate interactive HTML graph
+code-review-graph wiki             # Generate markdown wiki from communities
+code-review-graph detect-changes   # Risk-scored change impact analysis
+code-review-graph register <path>  # Register repo in multi-repo registry
+code-review-graph unregister <id>  # Remove repo from registry
+code-review-graph repos            # List registered repositories
+code-review-graph eval             # Run evaluation benchmarks
+code-review-graph serve            # Start MCP server
 ```
 
 </details>
@@ -200,6 +206,22 @@ Claude uses these automatically once the graph is built.
 | `list_graph_stats_tool` | Graph size and health |
 | `get_docs_section_tool` | Retrieve documentation sections |
 | `find_large_functions_tool` | Find functions/classes exceeding a line-count threshold |
+| `list_flows_tool` | List execution flows sorted by criticality |
+| `get_flow_tool` | Get details of a single execution flow |
+| `get_affected_flows_tool` | Find flows affected by changed files |
+| `list_communities_tool` | List detected code communities |
+| `get_community_tool` | Get details of a single community |
+| `get_architecture_overview_tool` | Architecture overview from community structure |
+| `detect_changes_tool` | Risk-scored change impact analysis for code review |
+| `refactor_tool` | Rename preview, dead code detection, suggestions |
+| `apply_refactor_tool` | Apply a previously previewed refactoring |
+| `generate_wiki_tool` | Generate markdown wiki from communities |
+| `get_wiki_page_tool` | Retrieve a specific wiki page |
+| `list_repos_tool` | List registered repositories |
+| `cross_repo_search_tool` | Search across all registered repositories |
+
+**MCP Prompts** (5 workflow templates):
+`review_changes`, `architecture_map`, `debug_issue`, `onboard_developer`, `pre_merge_check`
 
 </details>
 
@@ -210,13 +232,22 @@ Claude uses these automatically once the graph is built.
 | Feature | Details |
 |---------|---------|
 | **Incremental updates** | Re-parses only changed files. Subsequent updates complete in under 2 seconds. |
-| **15 languages** | Python, TypeScript, JavaScript, Vue, Go, Rust, Java, Scala, C#, Ruby, Kotlin, Swift, PHP, Solidity, C/C++ |
+| **18 languages** | Python, TypeScript/TSX, JavaScript, Vue, Go, Rust, Java, Scala, C#, Ruby, Kotlin, Swift, PHP, Solidity, C/C++, Dart, R, Perl |
 | **Blast-radius analysis** | Shows exactly which functions, classes, and files are affected by any change |
 | **Auto-update hooks** | Graph updates on every file edit and git commit without manual intervention |
-| **Semantic search** | Optional vector embeddings via sentence-transformers |
+| **Semantic search** | Optional vector embeddings via sentence-transformers, Google Gemini, or MiniMax |
 | **Interactive visualisation** | D3.js force-directed graph with edge-type toggles and search |
 | **Local storage** | SQLite file in `.code-review-graph/`. No external database, no cloud dependency. |
 | **Watch mode** | Continuous graph updates as you work |
+| **Execution flows** | Trace call chains from entry points, sorted by criticality |
+| **Community detection** | Cluster related code via Leiden algorithm or file grouping |
+| **Architecture overview** | Auto-generated architecture map with coupling warnings |
+| **Risk-scored reviews** | `detect_changes` maps diffs to affected functions, flows, and test gaps |
+| **Refactoring tools** | Rename preview, dead code detection, community-driven suggestions |
+| **Wiki generation** | Auto-generate markdown wiki from community structure |
+| **Multi-repo registry** | Register multiple repos, search across all of them |
+| **MCP prompts** | 5 workflow templates: review, architecture, debug, onboard, pre-merge |
+| **Full-text search** | FTS5-powered hybrid search combining keyword and vector similarity |
 
 <details>
 <summary><strong>Configuration</strong></summary>
@@ -231,10 +262,15 @@ vendor/**
 node_modules/**
 ```
 
-For semantic search, install the optional embeddings dependencies:
+Optional dependency groups:
 
 ```bash
-pip install code-review-graph[embeddings]
+pip install code-review-graph[embeddings]          # Local vector embeddings (sentence-transformers)
+pip install code-review-graph[google-embeddings]   # Google Gemini embeddings
+pip install code-review-graph[communities]         # Community detection (igraph)
+pip install code-review-graph[eval]                # Evaluation benchmarks (matplotlib)
+pip install code-review-graph[wiki]                # Wiki generation with LLM summaries (ollama)
+pip install code-review-graph[all]                 # All optional dependencies
 ```
 
 </details>

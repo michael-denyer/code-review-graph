@@ -1,6 +1,6 @@
 # Code Review Graph — User Guide
 
-**Version:** v1.8.4 (Mar 20, 2026)
+**Version:** v2.0.0 (Mar 26, 2026)
 
 ## Installation
 
@@ -51,6 +51,32 @@ pip install "code-review-graph[embeddings]"
 ```
 Then use `embed_graph_tool` to compute vectors. `semantic_search_nodes_tool` automatically uses vector similarity.
 
+Embedding providers: Local (sentence-transformers), Google Gemini, MiniMax. Configure via `CRG_EMBEDDING_MODEL` env var.
+
+### 7. Detect changes with risk scoring (v2)
+```
+Ask Claude: "Review my recent changes with risk scoring"
+```
+Uses `detect_changes_tool` to map diffs to affected functions, flows, communities, and test gaps.
+
+### 8. Explore architecture (v2)
+```
+Ask Claude: "Show me the architecture of this project"
+```
+Uses `get_architecture_overview_tool` for community-based architecture map with coupling warnings.
+
+### 9. Generate wiki (v2)
+```bash
+code-review-graph wiki
+```
+Creates markdown wiki pages for each detected community in `.code-review-graph/wiki/`.
+
+### 10. Multi-repo search (v2)
+```bash
+code-review-graph register /path/to/other/repo --alias mylib
+```
+Then use `cross_repo_search_tool` to search across all registered repositories.
+
 ## Token Savings
 
 | Scenario | Without graph | With graph |
@@ -61,7 +87,7 @@ Then use `embed_graph_tool` to compute vectors. `semantic_search_nodes_tool` aut
 
 ## Supported Languages
 
-Python, TypeScript, JavaScript, Vue, Go, Rust, Java, Scala, C#, Ruby, Kotlin, Swift, PHP, Solidity, C/C++
+Python, TypeScript/TSX, JavaScript, Vue, Go, Rust, Java, Scala, C#, Ruby, Kotlin, Swift, PHP, Solidity, C/C++, Dart, R, Perl
 
 ## What Gets Indexed
 

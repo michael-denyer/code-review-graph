@@ -174,4 +174,48 @@ CREATE TABLE metadata (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+-- Flows table (v2.0)
+CREATE TABLE flows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    entry_point_id INTEGER NOT NULL,
+    depth INTEGER NOT NULL,
+    node_count INTEGER NOT NULL,
+    file_count INTEGER NOT NULL,
+    criticality REAL NOT NULL DEFAULT 0.0,
+    path_json TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Flow memberships table (v2.0)
+CREATE TABLE flow_memberships (
+    flow_id INTEGER NOT NULL,
+    node_id INTEGER NOT NULL,
+    position INTEGER NOT NULL,
+    PRIMARY KEY (flow_id, node_id)
+);
+
+-- Communities table (v2.0)
+CREATE TABLE communities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    level INTEGER NOT NULL DEFAULT 0,
+    parent_id INTEGER,
+    cohesion REAL NOT NULL DEFAULT 0.0,
+    size INTEGER NOT NULL DEFAULT 0,
+    dominant_language TEXT,
+    description TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Full-text search virtual table (v2.0)
+CREATE VIRTUAL TABLE nodes_fts USING fts5(
+    name, qualified_name, file_path, signature,
+    content='nodes', content_rowid='rowid',
+    tokenize='porter unicode61'
+);
 ```
+
+The `nodes` table also has a `community_id INTEGER` column (added via migration v4) linking nodes to their detected community.

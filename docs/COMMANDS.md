@@ -19,27 +19,26 @@ Review a PR or branch diff.
 - Full impact analysis across all PR commits
 - Structured output with risk assessment
 
-## MCP Tools
+## MCP Tools (22 total)
 
-### `build_or_update_graph_tool`
+### Core Tools
+
+#### `build_or_update_graph_tool`
 ```
 full_rebuild: bool = False    # True for full re-parse
 repo_root: str | None         # Auto-detected
 base: str = "HEAD~1"          # Git diff base
 ```
 
-### `get_impact_radius_tool`
+#### `get_impact_radius_tool`
 ```
 changed_files: list[str] | None  # Auto-detected from git
 max_depth: int = 2               # Hops in graph
-max_results: int = 500           # Max impacted nodes to return
 repo_root: str | None
 base: str = "HEAD~1"
 ```
-> BFS traversal is capped at `max_results` nodes. Response includes `truncated` (bool) and `total_impacted` (int).
-> `repo_root` must point to a directory containing `.git` or `.code-review-graph`.
 
-### `query_graph_tool`
+#### `query_graph_tool`
 ```
 pattern: str    # callers_of, callees_of, imports_of, importers_of,
                 # children_of, tests_for, inheritors_of, file_summary
@@ -47,7 +46,7 @@ target: str     # Node name, qualified name, or file path
 repo_root: str | None
 ```
 
-### `get_review_context_tool`
+#### `get_review_context_tool`
 ```
 changed_files: list[str] | None
 max_depth: int = 2
@@ -57,136 +56,203 @@ repo_root: str | None
 base: str = "HEAD~1"
 ```
 
-### `semantic_search_nodes_tool`
+#### `semantic_search_nodes_tool`
 ```
 query: str           # Search string
 kind: str | None     # File, Class, Function, Type, Test
 limit: int = 20
 repo_root: str | None
+model: str | None    # Embedding model (falls back to CRG_EMBEDDING_MODEL env var)
 ```
 
-### `embed_graph_tool`
+#### `embed_graph_tool`
 ```
 repo_root: str | None
+model: str | None    # Embedding model name
 ```
 Requires: `pip install code-review-graph[embeddings]`
 
-### `list_graph_stats_tool`
+#### `list_graph_stats_tool`
 ```
 repo_root: str | None
 ```
 
-### `find_large_functions_tool`
+#### `find_large_functions_tool`
 ```
 min_lines: int = 50                # Minimum line count threshold
-max_lines: int | None              # Optional maximum line count
 kind: str | None                   # File, Class, Function, or Test
 file_path_pattern: str | None      # Filter by file path substring
 limit: int = 50                    # Max results to return
 repo_root: str | None
 ```
-> Find functions, classes, or files exceeding a line-count threshold. Results ordered by size (largest first).
 
-### `get_docs_section_tool`
+#### `get_docs_section_tool`
 ```
 section_name: str    # usage, review-delta, review-pr, commands, legal, watch, embeddings, languages, troubleshooting
+```
+
+### Flow Tools
+
+#### `list_flows_tool`
+```
+sort_by: str = "criticality"  # criticality, depth, node_count, file_count, name
+limit: int = 50
+kind: str | None              # Filter by entry point kind (e.g. "Test", "Function")
+repo_root: str | None
+```
+
+#### `get_flow_tool`
+```
+flow_id: int | None          # Database ID from list_flows_tool
+flow_name: str | None        # Name to search (partial match)
+include_source: bool = False # Include source snippets for each step
+repo_root: str | None
+```
+
+#### `get_affected_flows_tool`
+```
+changed_files: list[str] | None  # Auto-detected from git
+base: str = "HEAD~1"
+repo_root: str | None
+```
+
+### Community Tools
+
+#### `list_communities_tool`
+```
+sort_by: str = "size"    # size, cohesion, name
+min_size: int = 0
+repo_root: str | None
+```
+
+#### `get_community_tool`
+```
+community_name: str | None   # Name to search (partial match)
+community_id: int | None     # Database ID
+include_members: bool = False
+repo_root: str | None
+```
+
+#### `get_architecture_overview_tool`
+```
+repo_root: str | None
+```
+
+### Change Analysis and Refactoring Tools
+
+#### `detect_changes_tool`
+```
+base: str = "HEAD~1"
+changed_files: list[str] | None
+include_source: bool = False
+max_depth: int = 2
+repo_root: str | None
+```
+Primary tool for code review. Maps git diffs to affected functions, flows, communities, and test coverage gaps. Returns risk scores and prioritized review items.
+
+#### `refactor_tool`
+```
+mode: str = "rename"         # "rename", "dead_code", or "suggest"
+old_name: str | None         # (rename) Current symbol name
+new_name: str | None         # (rename) New name
+kind: str | None             # (dead_code) Function or Class
+file_pattern: str | None     # (dead_code) Filter by file path substring
+repo_root: str | None
+```
+
+#### `apply_refactor_tool`
+```
+refactor_id: str             # ID from prior refactor_tool call
+repo_root: str | None
+```
+
+### Wiki Tools
+
+#### `generate_wiki_tool`
+```
+repo_root: str | None
+force: bool = False          # Regenerate all pages even if unchanged
+```
+
+#### `get_wiki_page_tool`
+```
+community_name: str          # Community name to look up
+repo_root: str | None
+```
+
+### Multi-Repo Tools
+
+#### `list_repos_tool`
+```
+(no parameters)
+```
+
+#### `cross_repo_search_tool`
+```
+query: str
+kind: str | None
+limit: int = 20
+```
+
+## MCP Prompts (5 workflow templates)
+
+### `review_changes`
+Pre-commit review workflow using detect_changes, affected_flows, and test gaps.
+```
+base: str = "HEAD~1"
+```
+
+### `architecture_map`
+Architecture documentation using communities, flows, and Mermaid diagrams.
+
+### `debug_issue`
+Guided debugging using search, flow tracing, and recent changes.
+```
+description: str = ""
+```
+
+### `onboard_developer`
+New developer orientation using stats, architecture, and critical flows.
+
+### `pre_merge_check`
+PR readiness check with risk scoring, test gaps, and dead code detection.
+```
+base: str = "HEAD~1"
 ```
 
 ## CLI Commands
 
 ```bash
-# Register MCP server with Claude Code
-code-review-graph install           # also available as: code-review-graph init
-code-review-graph install --dry-run # preview without writing files
+# Setup
+code-review-graph install           # Register MCP server with Claude Code (alias: init)
+code-review-graph install --dry-run # Preview without writing files
 
-# Full build
-code-review-graph build
+# Build and update
+code-review-graph build                        # Full build
+code-review-graph update                       # Incremental update
+code-review-graph update --base origin/main    # Custom base ref
 
-# Incremental update
-code-review-graph update
-code-review-graph update --base origin/main  # custom base ref
+# Monitor and inspect
+code-review-graph status                       # Graph statistics
+code-review-graph watch                        # Auto-update on file changes
+code-review-graph visualize                    # Generate interactive HTML graph
 
-# Check status
-code-review-graph status
+# Analysis
+code-review-graph detect-changes               # Risk-scored change analysis
+code-review-graph detect-changes --base HEAD~3 # Custom base ref
+code-review-graph detect-changes --brief       # Compact output
 
-# Watch mode
-code-review-graph watch
+# Wiki
+code-review-graph wiki                         # Generate markdown wiki from communities
 
-# Generate graph visualisation
-code-review-graph visualize
+# Multi-repo
+code-review-graph register <path> [--alias name]  # Register a repository
+code-review-graph unregister <path_or_alias>       # Remove from registry
+code-review-graph repos                            # List registered repositories
 
-# Start MCP server
-code-review-graph serve
-```
+# Evaluation
+code-review-graph eval                         # Run evaluation benchmarks
 
-## API Response Schemas
-
-### `build_or_update_graph_tool`
-```json
-{
-  "files_parsed": 150,       // (full build) or "files_updated": 12 (incremental)
-  "total_nodes": 420,
-  "total_edges": 380,
-  "changed_files": ["src/auth.py"],      // incremental only
-  "dependent_files": ["src/routes.py"],   // incremental only
-  "errors": [{"file": "bad.py", "error": "SyntaxError"}]
-}
-```
-
-### `get_impact_radius_tool`
-```json
-{
-  "changed_nodes": [
-    {"id": 1, "kind": "Function", "name": "login", "qualified_name": "src/auth.py::login", "file_path": "src/auth.py", "line_start": 10, "line_end": 25, "language": "python", "is_test": false}
-  ],
-  "impacted_nodes": [ /* same shape */ ],
-  "impacted_files": ["src/routes.py", "src/middleware.py"],
-  "edges": [
-    {"id": 5, "kind": "CALLS", "source": "src/auth.py::login", "target": "src/db.py::get_user", "file_path": "src/auth.py", "line": 15}
-  ],
-  "truncated": false,
-  "total_impacted": 3
-}
-```
-
-### `query_graph_tool`
-```json
-{
-  "results": [
-    {"id": 1, "kind": "Function", "name": "login", "qualified_name": "...", "file_path": "...", "line_start": 10, "line_end": 25}
-  ]
-}
-```
-
-### `get_review_context_tool`
-```json
-{
-  "impact": { /* same as get_impact_radius_tool */ },
-  "source_snippets": {
-    "src/auth.py": "def login(...):\n    ..."
-  },
-  "review_guidance": "Focus on: login() changed parameters, check callers in routes.py"
-}
-```
-
-### `semantic_search_nodes_tool`
-```json
-{
-  "results": [
-    {"id": 1, "kind": "Function", "name": "authenticate", "qualified_name": "...", "file_path": "...", "similarity_score": 0.8732}
-  ]
-}
-```
-
-### `list_graph_stats_tool`
-```json
-{
-  "total_nodes": 420,
-  "total_edges": 380,
-  "nodes_by_kind": {"File": 50, "Function": 280, "Class": 60, "Type": 15, "Test": 15},
-  "edges_by_kind": {"CALLS": 200, "CONTAINS": 100, "IMPORTS_FROM": 50, "INHERITS": 20, "TESTED_BY": 10},
-  "languages": ["python", "typescript", "go"],
-  "files_count": 50,
-  "last_updated": "2026-02-27T14:30:00"
-}
+# Server
+code-review-graph serve                        # Start MCP server (stdio)
 ```
